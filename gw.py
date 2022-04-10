@@ -170,39 +170,22 @@ def publish(client, mqtt_topic, device, temp, pres, humi, solar, wind):
   return
 
 
-def read_sensors(device, sense_hat, ser, temp, pres, humi, solar, wind):
-  """Read Pi Sense HAT sensors or simulate the readings."""
+def read_sensors(ser):
+  """Read Arduino sensors from serial interface"""
   try:
-    if device == 'pi':
-      temp = sense_hat.get_temperature()
-      humi = sense_hat.get_humidity()
-      pres = sense_hat.get_pressure()
-      solar, wind = read_arduino_sensors(ser)
+      response = serial_send_and_receive(ser, '0')
+      response = response.rstrip()
+      print('Received from Arduino: {}'.format(response))
+      if response[0] == '#':
+          sensors_data = response.split('#')[1]
+          humidity = sensors_data.split(',')[0]
+          temperature = sensors_data.split(',')[1]
+      else:
+          print('Error getting Arduino sensor values over serial')
+          return 0
   except IOError:
     print('I/O Error')
-  return temp, pres, humi, solar, wind
-
-
-def read_arduino_sensors(ser):
-  """Request and receive sensor readings from Arduino over serial."""
-  s = {}
-  response = serial_send_and_receive(ser, '0')
-  response = response.rstrip()
-  print('Received from Arduino: {}'.format(response))
-  if response[0] == 'S':
-    pairs = response.split(' ')
-    for pair in pairs:
-      if pair == 'S':
-        continue
-      else:
-        name, value = pair.split(':')
-        s[name] = value
-  else:
-    print('Error getting Arduino sensor values over serial')
-    return 0
-  solar = int(s['s']) * (5.0 / 1024.0)
-  wind = int(s['w']) * (5.0 / 1024.0)
-  return solar, wind
+  return humidity, temperature
 
 
 def serial_send_and_receive(ser, theinput):
@@ -229,22 +212,7 @@ def simulate_sensors(prev, stdev, min, max):
   return new
 
 
-def init_sense_hat_and_serial(serial_port):
-  from sense_hat import SenseHat
-  import serial
-  print('Creating and flushing serial port. Rebooting Arduino..')
-  ser = serial.Serial(serial_port)
-  with ser:
-    ser.setDTR(False)
-    sleep(1)
-    ser.flushInput()
-    ser.setDTR(True)
-  ser = serial.Serial(serial_port, 115200, timeout=0.1)
-  print('Sleeping 3s..')
-  sense_hat = SenseHat()
-  sense_hat.get_humidity()
-  sleep(3)
-  return sense_hat, ser
+
 
 
 def main(argv):
