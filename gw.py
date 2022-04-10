@@ -60,12 +60,6 @@ def parse_command_line_args():
     type=int,
     help=('Expiration time, in minutes, for JWT tokens.'))
   parser.add_argument(
-    '--device_type',
-    choices=('sim', 'pi'),
-    default='sim',
-    required=True,
-    help='Type of device: sim|pi.')
-  parser.add_argument(
     '--serial_port',
     default='/dev/ttyACM0',
     help='Serial port device connected to the Arduino.')
@@ -203,37 +197,15 @@ def serial_send_and_receive(ser, theinput):
   return 'E'
 
 
-def simulate_sensors(prev, stdev, min, max):
-  """Gaussian distribution for simulated sensor readings."""
-  delta = random.gauss(0, stdev)
-  new = prev + delta
-  if new < min or new > max:
-    new = prev - delta
-  return new
-
-
-
-
-
 def main(argv):
   args = parse_command_line_args()
 
   sub_topic = 'events' if args.message_type == 'event' else 'state'
   mqtt_topic = '/devices/{}/{}'.format(args.device_id, sub_topic)
 
-  device = args.device_type
-  if device == 'pi':
-    sense_hat, ser = init_sense_hat_and_serial(args.serial_port)
-  else:
-    sense_hat = None
-    ser = None
-
   # Default starting values for simulated sensor readings
-  temp = 24
-  pres = 1013
-  humi = 50.0
-  solar = -1.0
-  wind = -1.0
+  temperature = 24
+  humidity = 50.0
 
   jwt_iat = datetime.datetime.utcnow()
   jwt_exp_mins = args.jwt_expires_minutes
@@ -254,9 +226,8 @@ def main(argv):
         args.registry_id, args.device_id, args.private_key_file,
         args.algorithm, args.ca_certs, args.mqtt_bridge_hostname,
         args.mqtt_bridge_port)
-    temp, pres, humi, solar, wind = read_sensors(device, sense_hat, ser, temp,
-                                                 pres, humi, solar, wind)
-    publish(client, mqtt_topic, device, temp, pres, humi, solar, wind)
+    humidity, temperature = read_sensors(ser)
+    publish(client, mqtt_topic, humidity, temperature)
     sleep(1)
 
 
